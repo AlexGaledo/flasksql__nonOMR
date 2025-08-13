@@ -1,0 +1,14 @@
+Done creating inital landing 
+sql pass mintjulep12
+
+create sql CRUD, login system:
+- username, password
+
+currently raw CRUD
+CREATE Done
+READ Done
+UPDATE Done
+DELETE 
+later implement auths and encryptions (flask bcrypt // jwt tokens)
+auths path
+
