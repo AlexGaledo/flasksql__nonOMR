@@ -11,6 +11,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     CORS(app)
+    
 
     app.config['SQLALCHEMY_DATABASE_URI'] = Config.sql
 

@@ -2,12 +2,13 @@ from .session import engine
 from sqlalchemy import text
 from flask import jsonify
 from flask_bcrypt import generate_password_hash, check_password_hash
+import traceback
 
 
 #connection.execute for executing sql syntax
 #connection.commit for committing
 
-#CREATE TABLE IF NOT EXISTS
+#CREATE TABLE IF NOT EXISTS ( one time use code )
 def initialize_table():
     with engine.connect() as connection:
         connection.execute(text("CREATE TABLE IF NOT EXISTS users "
@@ -19,34 +20,38 @@ def initialize_table():
 
 #sign-up
 def sign_up(username,password):
+    initialize_table()
     try:
         hashed_password = generate_password_hash(password).decode('utf-8')
         with engine.begin() as connection:
             connection.execute(text(
             "INSERT INTO users (username, password) VALUES (:username,:password)"),
             {"username":username,"password":hashed_password})
+
     except Exception as e:
-        return jsonify({'response':f'error{e}'}),404
+        traceback.print_exc()
+        raise
+    
+    
 
 #sign-in
-def sign_in(username,password):
-    try: 
-        user = find_user(username)
-        stored_password = user['password']
-        if check_password_hash(stored_password,password):
-            return jsonify({'id':user['id'], 'username':user['username']})
-    except Exception as e:
-        return jsonify({'response':f'error:{e}'}),404
+def sign_in(username, password):
+    user = find_user(username)
+    if user and check_password_hash(user['password'], password):
+        return {"id": user['id'], "username": user['username']}
+    return None
+        
     
 #change password
 def change_password(username,new_password):
     try:
         hashed_password = generate_password_hash(new_password).decode('utf-8')
-        with engine.connect() as connection:
+        with engine.begin() as connection:
             connection.execute(text(
                 "UPDATE users SET password = :new_password " \
                 "WHERE username = :username"),
                 {"new_password":hashed_password,"username":username})
+            
         return jsonify({"response":"password updated"}),200
     except Exception as e:
         return jsonify({'response':f'error:{e}'})
@@ -55,12 +60,15 @@ def change_password(username,new_password):
 def delete_user(username):
     try:
         user = find_user(username)
-        with engine.connect() as connection:
-            connection.execute(text(
-                "DELETE FROM users " \
-                "WHERE username = :username"),
-            {'username':username})
-        return jsonify({"response":"user deleted"}),200
+        if user is None:
+            return jsonify({"response":"user not found"}),404
+        else:
+            with engine.connect() as connection:
+                connection.execute(text(
+                    "DELETE FROM users " \
+                    "WHERE username = :username"),
+                {'username':username})
+            return jsonify({"response":"user deleted"}),200
     except Exception as e:
         return jsonify({"response":f"error{e}"})    
     
@@ -69,13 +77,12 @@ def delete_user(username):
 #results returns graph points
 def find_user(username):
     with engine.connect() as connection:
-         result = connection.execute(text(
-            "SELECT * FROM users " \
-            "WHERE username = :username"),
-            {"username":username})
-         
-         row = result.mappings().fetchone()
-         return row if row else False
+        result = connection.execute(
+            text("SELECT * FROM users WHERE username = :username"),
+            {"username": username}
+        )
+        row = result.mappings().fetchone()
+        return dict(row) if row else None
     
 
 
